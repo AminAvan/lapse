@@ -196,6 +196,7 @@ def estimate_processing_and_communication_latency(service: object, edge_server: 
     remove_service_from_server(service=service, edge_server=edge_server)
 
     e2e_proc_latency = communication_latency + processing_latency
+    print(f"e2e_proc_latency:{e2e_proc_latency}")
 
     return e2e_proc_latency
 
@@ -241,11 +242,20 @@ def compute_operator_comm_latency(service: Service) -> float:
         float: Communication latency of the service.
     """
 
+    # Initialize the function attribute if it doesn't exist
+    if not hasattr(compute_operator_comm_latency, "flow_of_first_service"):
+        compute_operator_comm_latency.flow_of_first_service = None
+
     communication_latency = 0
 
     # Check if the service has a flow, if not it means that the service is at the same server as the previous service
+    """
+    Rev1
+    """
+    flow_of_first_service = None
     if len(service.flows) > 0:
         for flow in service.flows:
+            compute_operator_comm_latency.flow_of_first_service = flow
             # Get the min value from the bandwidth dict
             min_bandwidth = min(flow.bandwidth.values())
 
@@ -255,6 +265,12 @@ def compute_operator_comm_latency(service: Service) -> float:
                 delay += link["delay"]
 
             time_to_transfer = (flow.data_to_transfer / min_bandwidth) + (delay * service.input_event_rate)
+            # print(f"service: {service}")
+            # print(f"flow.data_to_transfer: {flow.data_to_transfer}")
+            # print(f"min_bandwidth: {min_bandwidth}")
+            # print(f"delay: {delay}")
+            # print(f"service.input_event_rate: {service.input_event_rate}")
+
 
             logger.debug(
                 "\tMoving data from {} to {}. Time to transfer: {} seconds".format(
@@ -272,6 +288,27 @@ def compute_operator_comm_latency(service: Service) -> float:
 
             # Since a service can have multiple flows, we need to get the max communication latency from the slowest flow
             communication_latency = max(communication_latency, time_to_transfer)
+
+    elif (len(service.flows) == 0):
+        # Get the min value from the bandwidth dict
+        min_bandwidth = min(compute_operator_comm_latency.flow_of_first_service.bandwidth.values())
+
+        # Get links delay
+        delay = 0
+        for link in compute_operator_comm_latency.flow_of_first_service.network_links:
+            delay += link["delay"]
+
+        time_to_transfer = (compute_operator_comm_latency.flow_of_first_service.data_to_transfer / min_bandwidth) + (
+                    delay * service.input_event_rate)
+        # print(f"service: {service}")
+        # print(f"flow.data_to_transfer: {compute_operator_comm_latency.flow_of_first_service.data_to_transfer}")
+        # print(f"min_bandwidth: {min_bandwidth}")
+        # print(f"delay: {delay}")
+        # print(f"service.input_event_rate: {service.input_event_rate}")
+        # print()
+
+        # Since a service can have multiple flows, we need to get the max communication latency from the slowest flow
+        communication_latency = max(communication_latency, time_to_transfer)
 
     else:
         logger.debug(f"\tService {service.id} does not have NetworkFlow.")
@@ -300,14 +337,24 @@ def calculate_placement_processing_latency(application: Application) -> float:
         for service in services:
             # Compute communication time
             communication_time = compute_operator_comm_latency(service=service)
+            # print(f"communication_time: {communication_time}")
+            # print(f"communication time for {service} is {communication_time}")
 
             # Compute computation time (i.e., processing latency)
             processing_time = compute_operator_processing_time(
                 service=service,
                 edge_server=service.server,
             )
+            # print(f"processing time for {service} is {processing_time}")
+            # print()
 
             processing_latency_by_service[service] = processing_time + communication_time
+            # print(f"communication time {service}: {communication_time}")
+            # print(f"processing time {service}: {processing_time}")
+            # print(f"memory demand of {service} is {service.memory_demand}")
+            # print(f"MIPS demand of {service} is {service.mips_demand}")
+            # print(f"processing_latency_by_service[{service}]:{processing_latency_by_service[service]}")
+            # print()
 
         processing_latency = sum(processing_latency_by_service.values())
 

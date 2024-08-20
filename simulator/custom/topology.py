@@ -13,10 +13,20 @@ def compute_processing_latency():
 
     for app in Application.all():
         processing_latency[app.id] = calculate_placement_processing_latency(app)
-        avg_event_processing_latency[app.id] = processing_latency[app.id] / app.services[0].input_event_rate
+        """
+        Rev2
+        """
+        avg_event_processing_latency[app.id] = processing_latency[app.id] / (len(app.services))
+        # avg_event_processing_latency[app.id] = processing_latency[app.id] / app.services[0].input_event_rate
+        # if avg_event_processing_latency[app.id] > 0: print(f"avg_event_processing_latency[{app.id}]:{avg_event_processing_latency[app.id]}")
+        # print(f"real processing latency:{processing_latency[app.id] / (len(app.services))} with {(len(app.services))} services")
 
+        # if avg_event_processing_latency[app.id] > 0:
+        #     print(f"avg_event_processing_latency[{app.id}]:{avg_event_processing_latency[app.id]}")
+        #     print(f"app.processing_latency_sla:{app.processing_latency_sla}")
         # Check processing latency SLA violation
         if avg_event_processing_latency[app.id] > app.processing_latency_sla:
+            # print("miss")
             processing_latency_sla_violation[app.id] = True
             app.processing_latency_sla_violation = True
 
